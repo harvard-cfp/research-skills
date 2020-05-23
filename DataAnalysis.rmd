@@ -1,0 +1,590 @@
+---
+title: Self-Efficacy and Performance of Research Skills Among First-Semester Bioscience
+  Doctoral Students
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook detailing all of the data analysis completed for the paper entitled "Self-Efficacy and Performance of Research Skills Among First-Semester Bioscience Doctoral Students". 
+
+**All analyses were performed by K. Lachance. This notebook was compiled on May 22, 2020.** 
+
+# Library Import
+
+Import libraries and packages required for analysis and visualization and set seed for reproducibility.
+
+```{r}
+# Install packages, if not already installed
+list.of.packages <- c("reshape2", "ggplot2", "gridExtra", "grid", "orddom", "svglite")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+# Load packages
+library(reshape2) # Data structure manipulation
+library(ggplot2) # Plotting
+library(gridExtra) # Plotting
+library(grid) # Plotting
+library(orddom) # Statistics
+library(svglite) # Plotting
+
+# Make jitter plots and other analyses / visualizations reproducible
+set.seed(123)
+```
+
+# Data Import
+
+Import data, contained in ExperimentalDesignData.csv file. Each row corresponds to a student (identified with an anonymous code) and each column contains information about that student's response about research skills self-efficacy, experimental design aptitude, experience, and demographic information. In total, 103 students were surveyed (only students that completed all pre- and post-test assessments were included in this study). 
+
+```{r}
+# Main data
+data = read.csv(file = "./StudentData.csv", header = TRUE, row.names = 1, stringsAsFactors = FALSE) # Import data
+numStudents = nrow(data) # Calculate number of students in cohort to be analyzed
+
+# Print output
+cat(paste("There are ", numStudents, " student responses contained in the following analyses.\n", sep ="")) 
+
+# Factors in experience and comfort
+data2 = read.csv(file = "./ExperienceComfortFactors.csv", header = TRUE, stringsAsFactors = FALSE) # Import data for Fig 4
+```
+
+***
+
+# Figure 1
+
+Length of time spent doing pre-doctoral research is not predictive of student research skills self-efficacy or self-reported experience and comfort with experimental design.
+
+**Figure 1A**
+```{r}
+# Make a data frame holding frequency of students' previous research experience
+labExp <- melt(table(data$LabExp))
+colnames(labExp) = c("Years", "Freq")
+labExp$Years = as.character(labExp$Years)
+labExp$Percent = round((labExp$Freq / numStudents) * 100, 0)
+
+# Make pie chart
+labExp$Years <- factor(labExp$Years, levels = c("7", "6", "5", "4", "3", "2", "1")) # Re-order for plotting
+fig1a <- ggplot(labExp, aes(x="", y=Percent, fill=Years))+
+  geom_bar(width = 1, stat = "identity") + 
+  coord_polar("y", start=0) + 
+  scale_fill_manual("Previous Lab Experience", values=c("#333333", "#4C4C4C", "#666666", "#808080", "#999999", "#B2B2B2", "#CCCCCC"), 
+                    labels=c(paste("> 7 years (", labExp$Percent[7], "%)", sep=""),
+                             paste("6 - 7 years (", labExp$Percent[6], "%)", sep=""),
+                             paste("5 - 6 years (", labExp$Percent[5], "%)", sep=""),
+                             paste("4 - 5 years (", labExp$Percent[4], "%)", sep=""),
+                             paste("3 - 4 years (", labExp$Percent[3], "%)", sep=""),
+                             paste("2 - 3 years (", labExp$Percent[2], "%)", sep=""),
+                             paste("< 2 years (", labExp$Percent[1], "%)", sep="")))+
+  theme_minimal() +
+  theme(axis.title = element_blank(), panel.border = element_blank(), panel.grid=element_blank(), axis.ticks = element_blank(), axis.text=element_blank()) + 
+  ggtitle("Figure 1A") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(filename = "./Figures/Fig1A.svg", plot = fig1a, width = 6, height = 4)
+plot(fig1a)
+```
+
+**Figure 1B**
+``` {r}
+# Split data by responses to self-efficacy questionaire before and after the first semester of graduate school
+SE_pre = data[,14:27]
+SE_post = data[,28:41]
+SE_pre$LabExp = as.character(data$LabExp)
+SE_post$LabExp = as.character(data$LabExp)
+# Melt responses
+mSE_pre = melt(SE_pre)
+mSE_post = melt(SE_post)
+
+# Add question number label to each pre / post array
+mSE_pre$Question = rep(c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14"), each = numStudents)
+mSE_pre$Test = "Pre"
+mSE_post$Question = rep(c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14"), each = numStudents)
+mSE_post$Test = "Post"
+
+# Change labels to strings for categorical plotting
+mSE_pre[mSE_pre$value==1,"value"] = "a1" # Not at all, pre-test
+mSE_pre[mSE_pre$value==2,"value"] = "b1" # A little, pre-test
+mSE_pre[mSE_pre$value==3,"value"] = "c1" # A moderate amount, pre-test
+mSE_pre[mSE_pre$value==4,"value"] = "d1" # A lot, pre-test
+mSE_pre[mSE_pre$value==5,"value"] = "e1" # A great deal, pre-test
+
+mSE_post[mSE_post$value==1,"value"] = "a2" # Not at all, post-test
+mSE_post[mSE_post$value==2,"value"] = "b2" # A little, post-test
+mSE_post[mSE_post$value==3,"value"] = "c2" # A moderate amount, post-test
+mSE_post[mSE_post$value==4,"value"] = "d2" # A lot, post-test
+mSE_post[mSE_post$value==5,"value"] = "e2" # A great deal, post-test
+
+# Stacked bar chart
+labexp.labs = c("< 2 years", "2 - 3 years", "3 - 4 years", "4 - 5 years", "5 - 6 years", "6 - 7 years", "> 7 years")
+names(labexp.labs) = as.character(1:7)
+
+fig1b <- ggplot(mSE_pre, aes(Test)) + 
+  geom_bar(aes(fill=value), position = "fill") + facet_grid(~ LabExp, labeller = labeller(LabExp = labexp.labs)) + 
+  theme_bw() + 
+  scale_fill_manual("Research Skills Self-Efficacy", values = c("a1" = "#DAE3F3", "b1" = "#B4C7E7", "c1" = "#8FAADC", "d1" = "#2F5597", "e1" = "#203864"), labels = c("Not at all", "A little", "A moderate amount", "A lot", "A great deal")) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  theme(axis.title=element_blank(), axis.text=element_blank(), axis.ticks=element_blank(), strip.background = element_blank()) + 
+  ggtitle("Figure 1B") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig1b, filename="./Figures/Fig1B.svg", width = 4, height = 3)
+plot(fig1b)
+```
+
+**Figure 1Ci**
+```{r}
+# Calculate linear regression
+lm_exp = lm(formula = ExperimetalDeignExperience ~ LabExp, data = data)
+summary(lm_exp) # Adjusted R-squared:  0.06328
+
+# Scatter plot
+fig1ci <- ggplot(data, aes(x = LabExp, y = ExperimetalDeignExperience)) +
+  geom_jitter(width = 0.25, height = 0.25, size = 2, color = "#808080") +  
+  scale_x_continuous("Previous years working in lab", breaks=c(1:7), limits=c(0.5,7.5), labels = c("< 2 years", "2 - 3 years", "3 - 4 years", "4 - 5 years", "5 - 6 years", "6 - 7 years", "> 7 years")) + 
+  scale_y_continuous("Self-reported experience\nwith experimental design", breaks=c(1:5), limits=c(0.5,5.5), labels = c("None", "Minimal", "Some", "Moderate", "Extensive")) + 
+  theme_bw() + 
+  theme(panel.grid.minor = element_blank()) + 
+  ggtitle(expression(paste("Figure 1Ci (", R^2," = ", 0.06, ")", sep=""))) + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig1ci, filename="./Figures/Fig1Ci.svg", width = 4, height = 3)
+plot(fig1ci)
+```
+
+**Figure 1Cii**
+```{r}
+# Histogram
+fig1cii <- ggplot(data, aes(x = ExperimetalDeignExperience)) + 
+  geom_histogram(binwidth = 0.5, fill = "#174E94") + 
+  theme_bw() +
+  scale_x_continuous("Self-reported experience\nwith experimental design", breaks=c(1:5), labels = c("None", "Minimal", "Some", "Moderate", "Extensive")) + 
+  ylim(0, 40) + ylab("Number of students") + 
+  coord_flip() + 
+  theme(panel.grid.minor = element_blank(), panel.grid.major = element_blank()) + 
+  ggtitle("Figure 1Cii") + theme(plot.title = element_text(hjust = 0.5))
+
+plot(fig1cii)
+ggsave(fig1cii, filename="./Figures/Fig1Cii.svg", width = 4, height = 3)
+```
+
+**Figure 1Di**
+```{r}
+# Calculate linear regression
+lm_comf = lm(formula = ExperimetalDeignComfort ~ LabExp, data = data)
+summary(lm_comf) # Adjusted R-squared:  0.05171 
+
+# Scatter plot
+fig1di <- ggplot(data, aes(x = LabExp, y = ExperimetalDeignComfort)) +
+  geom_jitter(width = 0.25, height = 0.25, size = 2, color = "#808080") + 
+  scale_x_continuous("Previous years working in lab", breaks=c(1:7), limits=c(0.5,7.5), labels = c("< 2 years", "2 - 3 years", "3 - 4 years", "4 - 5 years", "5 - 6 years", "6 - 7 years", "> 7 years")) + 
+  scale_y_continuous("Self-reported comfort\nwith experimental design", breaks=c(1:7), limits=c(0.5,7.5), labels = c("Extremely uncomfortable", "Moderately uncomfortable", "Slightly uncomfortable", "Neither comfortable nor uncomfortable", "Slightly comfortable", "Moderately comfortable", "Extremely comfortable")) + 
+  theme_bw() + 
+  theme(panel.grid.minor = element_blank()) + 
+  ggtitle(expression(paste("Figure 1Di (", R^2," = ", 0.05, ")", sep=""))) + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig1di, filename="./Figures/Fig1Di.svg", width = 4, height = 3)
+plot(fig1di)
+```
+
+**Figure 1Dii**
+```{r}
+# Histogram
+fig1dii <- ggplot(data, aes(x = ExperimetalDeignComfort)) + 
+  geom_histogram(binwidth = 0.5, fill = "#174E94") + 
+  theme_bw() +
+  scale_x_continuous("Self-reported Comfort\nwith experimental design", breaks=c(1:7), labels = c("Extremely uncomfortable", "Moderately uncomfortable", "Slightly uncomfortable", "Neither comfortable nor uncomfortable", "Slightly comfortable", "Moderately comfortable", "Extremely comfortable")) + 
+  ylim(0, 40) + ylab("Number of students") + 
+  coord_flip() + 
+  theme(panel.grid.minor = element_blank(), panel.grid.major = element_blank()) + 
+  ggtitle("Figure 1Dii") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig1dii, filename="./Figures/Fig1Dii.svg", width = 4, height = 3)
+plot(fig1dii)
+```
+
+# Figure 2
+
+Students improved their performance of experimental design over the first semester of doctoral training.
+
+**Figure 2A**
+```{r}
+# Note that only 2017 data can be used in BEDCI calculations
+data_2017 = data[data$Year == "2017",]
+numStudents_2017 = nrow(data_2017) # Calculate number of students in cohort to be analyzed (2017)
+# Print output
+cat(paste("There are ", numStudents_2017, " student responses contained in the following BEDCI analyses.\n", sep ="")) 
+
+# Calculate linear regression
+lm_bedci = lm(formula = Pre_CITotal ~ LabExp, data = data_2017)
+summary(lm_bedci) # Adjusted R-squared:  0.018
+
+# Plot histograms
+fig2a <- ggplot(data_2017, aes(x = (Pre_CITotal / 14) * 100, y = LabExp)) +
+  geom_jitter(width = 0.25, height = 0.25, size = 2, color = "#174E94") +
+  coord_flip() + 
+  scale_x_continuous("Total BEDCI score (%)", breaks=seq(40, 100, 20), limits=c(30, 90)) +  
+  scale_y_continuous("Previous years working in lab", breaks=c(1:7), limits=c(0.5,7.5), labels = c("< 2 years", "2 - 3 years", "3 - 4 years", "4 - 5 years", "5 - 6 years", "6 - 7 years", "> 7 years")) +
+  theme_bw()+ 
+  theme(panel.grid.minor = element_blank()) + 
+  ggtitle(expression(paste("Figure 2A (", R^2," = ", 0.02, ")", sep=""))) + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig2a, filename="./Figures/Fig2A.svg", width = 4, height = 3)
+plot(fig2a)
+```
+
+**Figure 2B**
+```{r}
+# Calculate scores (in percent)
+pre_score = data.frame(Score = (data_2017$Pre_CITotal / 14) * 100, Test = "Pre", stringsAsFactors = FALSE)
+post_score = data.frame(Score = (data_2017$Post_CITotal / 14) * 100, Test = "Post", stringsAsFactors = FALSE)
+BEDCI_score = rbind(pre_score, post_score)
+
+# Perform wilcoxon signed-rank test
+wTest = wilcox.test(data_2017$Pre_CITotal, data_2017$Post_CITotal, paired=TRUE, alternative = "two.sided", exact = FALSE)
+
+# Determine significance level
+sig1 = "is NOT a statistically significant difference"
+sig2 = ""
+if (wTest$p.value < 0.001) {
+  sig1 = "IS a statistically significant difference"
+  sig2 = "***"
+} else if (wTest$p.value < 0.01) {
+  sig1 = "IS a statistically significant difference"
+  sig2 = "**"
+} else if (wTest$p.value < 0.05) {
+  sig1 = "IS a statistically significant difference"
+  sig2 = "*"
+}
+
+# Print output 
+cat(paste("By a Wilcoxon signed-rank test, there ", sig1, " between student performance on the BEDCI concept inventory before and after their first semester of graduate school (V = ", wTest$statistic, ", p = ", round(wTest$p.value, 4), sig2, ")", sep=""))
+
+# Order for plotting
+BEDCI_score$Test <- factor(BEDCI_score$Test, levels = c('Pre','Post'), ordered = TRUE)
+
+# Create violin plot
+fig2b <- ggplot(BEDCI_score, aes(x = Test, y = Score)) + 
+  geom_violin(draw_quantiles = c(0.5), scale = "width", aes(fill = Test)) + 
+  geom_jitter(height = 3, width = 0.1) + 
+  scale_fill_manual(values = c("#174E94", "#EE7D31")) +
+  scale_y_continuous("Total BEDCI score (%)", breaks = seq(40, 100, 20), labels = seq(40, 100, 20)) + 
+  scale_x_discrete(labels = c("Pre-test", "Post-test")) + 
+  theme_bw() + 
+  theme(panel.grid.minor = element_blank(), panel.grid.major = element_blank(), axis.title.x = element_blank(), legend.position="none") + 
+  ggtitle("Figure 2B") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig2b, filename="./Figures/Fig2B.svg", width = 2, height = 3)
+plot(fig2b)
+```
+
+**Figure 2C**
+```{r}
+# Function for calculating standard error of the mean
+stderr_perc <- function(x, na.rm=FALSE) {
+  if (na.rm) x <- na.omit(x)
+  y = (x / numStudents_2017) * 100
+  sqrt(var(y))
+}
+
+# Make data frame suitable for plotting
+Q = c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14") # Order of questions by subject matter
+mCI_pre = data.frame(Question = Q, Test = "Pre", Score = (colSums(data_2017[,42:55]) / numStudents_2017) * 100, SEM = apply(as.matrix(data_2017[,42:55]), 2, stderr_perc), stringsAsFactors = FALSE) # Calculate mean score for each question on the pre-test
+mCI_post = data.frame(Question = Q, Test = "Post", Score = (colSums(data_2017[,57:70]) / numStudents_2017) * 100, SEM = apply(as.matrix(data_2017[,42:55]), 2, stderr_perc), stringsAsFactors = FALSE) # Calculate mean score for each question on the post-test
+
+# Combine
+mCI = rbind(mCI_pre, mCI_post)
+
+# Function to perform McNemar's chi-squared test for each question on the BEDCI pre- and post-tests
+mcNemarChiSquaredTest <- function(dat, Q) { 
+  
+  # Get relevant data for each question
+  pre = dat[,(Q+41)]
+  post = dat[,(Q+56)]
+  
+  # Calculate values to populate matrix
+  c_c = sum(pre + post == 2) # Correct, correct
+  i_c = sum(pre - post == -1) # Incorrect, correct
+  c_i = sum(pre - post == 1) # Correct, incorrect
+  i_i = sum(pre + post == 0) # Incorrect, incorrect
+  
+  # Create confusion matrix
+  mat = matrix(c(c_c, i_c, c_i, i_i), nrow = 2, dimnames = list("Pre" = c("Correct", "Incorrect"), "Post" = c("Correct", "Incorrect")))
+  
+  # Calculate significance
+  mcnemar.test(mat)
+}
+
+# Calculate the p-value for each question and save to an output table
+coreConcepts = c("Controls", "", "Hypotheses", "", "Biological variation", "", "Accuracy", "Extraneous factors", "", "Independent sampling", "", "Random sampling", "", "Purpose of experiments")
+questions = c(1, 5, 2, 9, 3, 10, 4, 6, 14, 7, 12, 8, 13, 11) # Questions ordered by subject
+sigOut = data.frame(CoreConcept = coreConcepts, Question = questions, Chi = rep(0, 14), pValue = rep(0, 14), Significance = rep("", 14), stringsAsFactors = FALSE)
+i = 1 # Iterate over every row of output
+for (q in questions) {
+  mnTest = mcNemarChiSquaredTest(data_2017, q)
+  sigOut$Chi[i] = round(mnTest$statistic, 2)
+  sigOut$pValue[i] = round(mnTest$p.value, 4)
+  i = i + 1
+}
+
+pValues = p.adjust(sigOut$pValue, method = "fdr")
+for (i in 1:14) {
+  sigOut$pAdj[i] = round(pValues[i], 4)
+  if (sigOut$pAdj[i] < 0.001) {
+    sigOut$Significance[i] = "***"
+  } else if (sigOut$pAdj[i] < 0.01) {
+    sigOut$Significance[i] = "**"
+  } else if (sigOut$pAdj[i] < 0.05) {
+    sigOut$Significance[i] = "*"
+  }
+}
+
+# Print signficance table
+print(sigOut) 
+
+# Reorder for plotting
+mCI$Question <- factor(mCI$Question, levels = c('Q1', 'Q5', 'Q2', 'Q9', 'Q3', 'Q10', 'Q4', 'Q6', 'Q14', 'Q7', 'Q12', 'Q8', 'Q13', 'Q11'), ordered = TRUE)
+mCI$Test <- factor(mCI$Test, levels = c('Pre','Post'), ordered = TRUE)
+
+# Create bar chart
+fig2c <- ggplot(mCI, aes(x = Question, y = Score, fill = Test, group = Test)) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_errorbar(aes(ymin=Score-SEM, ymax=Score+SEM), colour="black", width = 0.3, position = position_dodge(1)) +
+  scale_fill_manual("", values = c("#174E94", "#EE7D31"), labels = c("Pre-test", "Post-test")) +
+  ylab("% of students providing expert-like answers") + 
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank(), axis.title.x = element_blank()) + 
+  ggtitle("Figure 2C") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig2c, filename="./Figures/Figure2C.svg", width = 5, height = 3)
+plot(fig2c)
+```
+
+
+# Figure 3
+
+Students significantly improved in many aspects of research skills self-efficacy during their first semester of doctoral training.
+
+**Figure 3B**
+```{r}
+# Test for significance
+wilcoxonSignedRankTest <- function(dat, Q) {
+  
+# Get the data of interest for each question
+  pre = dat[,Q+13]
+  post = dat[,(Q+27)]
+  
+  # Perform wilcoxon signed-rank test for significance
+  wilcox.test(pre, post, paired=TRUE, alternative = "two.sided", exact=FALSE)
+}
+
+# Calculate the p-value for each question and save to an output table
+Items = c("Understand contemporary concepts in your field", "Make use of the primary scientific research literature in your field (e.g., journal articles)", "Identify a specific question for investigation based on the research in your field", "Formulate a research hypothesis based on a specific question", "Design an experiment or theoretical test of the hypothesis", "Understand the importance of 'controls' in research", "Observe and collect data", "Statistically analyze data", "Interpret data by relating results to the original hypothesis", "Reformulate your original research hypothesis (as appropriate)", "Relate your results to the 'bigger picture' in your field", "Orally communicate the results of research projects", "Write a research paper for publication", "Think independently")
+sigOut = data.frame(Item = Items, Question = 1:14, V = rep(0, 14), pValue = rep(0, 14), Significance = rep("", 14), stringsAsFactors = FALSE)
+for (i in 1:14) {
+  wTest = wilcoxonSignedRankTest(data, i)
+  sigOut$V[i] = wTest$statistic
+  sigOut$pValue[i] = round(wTest$p.value, 4)
+}
+
+wTest_Total = wilcox.test(melt(SE_pre)$value, melt(SE_post)$value, paired=TRUE, alternative = "two.sided", exact=FALSE)
+tmp = data.frame(Item = "Total", Question = 15, V = wTest_Total$statistic, pValue = round(wTest_Total$p.value, 4),Significance = "", stringsAsFactors = F)
+sigOut[15,] = tmp
+
+pValues = p.adjust(sigOut$pValue, method = "fdr")
+for (i in 1:15) {
+  sigOut$pAdj[i] = round(pValues[i], 4)
+  if (sigOut$pAdj[i] < 0.001) {
+    sigOut$Significance[i] = "***"
+  } else if (sigOut$pAdj[i] < 0.01) {
+    sigOut$Significance[i] = "**"
+  } else if (sigOut$pAdj[i] < 0.05) {
+    sigOut$Significance[i] = "*"
+  }
+}
+
+# Print signficance table
+print(sigOut)
+
+# Combine melted self-efficacy data frames
+mSE = rbind(mSE_pre, mSE_post)
+
+# Re-order for plotting
+mSE$Test = factor(mSE$Test, levels = c("Pre", "Post"))
+mSE$Question = factor(mSE$Question, levels = c("Q1", "Q2", "Q3", "Q4", "Q5", "Q14", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13"))
+mSE$value = factor(mSE$value, levels = c("a1", "b1", "c1", "d1", "e1", "a2", "b2", "c2", "d2", "e2"))
+
+# Stacked bar chart
+fig3bi <- ggplot(mSE, aes(Test)) + 
+  geom_bar(aes(fill=value), position = "fill") + facet_grid(~ Question) + 
+  theme_bw() + 
+  scale_fill_manual("Research Skills\nSelf-Efficacy", 
+                    values = c("a1" = "#DAE3F3", "a2" = "#FBE5D6", "b1" = "#B4C7E7", "b2" = "#F8CBAD", "c1" = "#8FAADC", "c2" = "#F4B183", "d1" = "#2F5597", "d2" = "#C55A11", "e1" = "#203864", "e2" = "#843C0C"), labels = c("", "", "", "", "", "Not at all", "A little", "A moderate amount", "A lot", "A great deal")) + 
+  guides(fill=guide_legend(ncol = 2)) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  theme(axis.title=element_blank(), axis.text=element_blank(), axis.ticks=element_blank(), strip.background = element_blank()) + 
+  ggtitle("Figure 3Bi") +  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig3bi, filename="./Figures/Figure3Bi.svg", width = 5, height = 3)
+plot(fig3bi)
+```
+
+**Figure 3Bii**
+```{r}
+# Get total self-efficacy calculation
+mSE_total = data.frame(Test = rep(c("Pre", "Post"), each = 5), Lab = row.names(table(mSE$value)), Freq = as.vector(table(mSE$value)), stringsAsFactors = FALSE)
+mSE_total$Test <- factor(mSE_total$Test, levels = c("Pre", "Post"), ordered = TRUE)
+mSE_total$Lab = factor(mSE_total$Lab, levels = c("a1", "b1", "c1", "d1", "e1", "a2", "b2", "c2", "d2", "e2"))
+
+# Stacked bar chart
+fig3bii <- ggplot(mSE_total, aes(x=Test, y=Freq)) + 
+  geom_bar(aes(fill=Lab), stat = "identity", position = "fill") +
+  theme_bw() + 
+scale_fill_manual("Research Skills\nSelf-Efficacy", 
+                    values = c("a1" = "#DAE3F3", "a2" = "#FBE5D6", "b1" = "#B4C7E7", "b2" = "#F8CBAD", "c1" = "#8FAADC", "c2" = "#F4B183", "d1" = "#2F5597", "d2" = "#C55A11", "e1" = "#203864", "e2" = "#843C0C"), labels = c("", "", "", "", "", "Not at all", "A little", "A moderate amount", "A lot", "A great deal")) + 
+  guides(fill=guide_legend(ncol = 2)) + 
+  xlab("Total") + 
+  theme(panel.grid.minor = element_blank(), panel.grid.major = element_blank(), axis.text=element_blank(), axis.title.y=element_blank(), axis.ticks = element_blank()) +
+  ggtitle("Figure 3Bii") +  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig3bii, filename="./Figures/Figure3Bii.svg", width = 1, height = 3)
+plot(fig3bii)
+
+```
+
+**Figure 3C**
+```{r}
+SE_pre$Sex = as.character(data$Sex)
+SE_post$Sex = as.character(data$Sex)
+
+# Remove NA Sex
+SE_pre = SE_pre[!is.na(SE_pre$Sex),]
+SE_post = SE_post[!is.na(SE_post$Sex),]
+
+# Remove lab experience columns
+SE_pre = SE_pre[,-15]
+SE_post = SE_post[,-15]
+
+male_SE_pre = SE_pre[SE_pre$Sex == "Male",]
+female_SE_pre = SE_pre[SE_pre$Sex == "Female",]
+male_SE_post = SE_post[SE_post$Sex == "Male",]
+female_SE_post = SE_post[SE_post$Sex == "Female",]
+
+# Melt responses
+male_mSE_pre = melt(male_SE_pre)
+male_mSE_post = melt(male_SE_post)
+female_mSE_pre = melt(female_SE_pre)
+female_mSE_post = melt(female_SE_post)
+
+nMale = nrow(male_SE_pre)
+nFemale = nrow(female_SE_pre)
+
+# Add question number label to each pre / post array
+male_mSE_pre$Question = rep(c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14"), each = nMale)
+male_mSE_pre$Test = "Pre"
+male_mSE_post$Question = rep(c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14"), each = nMale)
+male_mSE_post$Test = "Post"
+
+female_mSE_pre$Question = rep(c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14"), each = nFemale)
+female_mSE_pre$Test = "Pre"
+female_mSE_post$Question = rep(c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14"), each = nFemale)
+female_mSE_post$Test = "Post"
+
+# Change labels to strings for categorical plotting
+male_mSE_pre[male_mSE_pre$value==1,"value"] = "m_a1" # Not at all, pre-test
+male_mSE_pre[male_mSE_pre$value==2,"value"] = "m_b1" # A little, pre-test
+male_mSE_pre[male_mSE_pre$value==3,"value"] = "m_c1" # A moderate amount, pre-test
+male_mSE_pre[male_mSE_pre$value==4,"value"] = "m_d1" # A lot, pre-test
+male_mSE_pre[male_mSE_pre$value==5,"value"] = "m_e1" # A great deal, pre-test
+
+male_mSE_post[male_mSE_post$value==1,"value"] = "m_a2" # Not at all, post-test
+male_mSE_post[male_mSE_post$value==2,"value"] = "m_b2" # A little, post-test
+male_mSE_post[male_mSE_post$value==3,"value"] = "m_c2" # A moderate amount, post-test
+male_mSE_post[male_mSE_post$value==4,"value"] = "m_d2" # A lot, post-test
+male_mSE_post[male_mSE_post$value==5,"value"] = "m_e2" # A great deal, post-test
+
+# Change labels to strings for categorical plotting
+female_mSE_pre[female_mSE_pre$value==1,"value"] = "f_a1" # Not at all, pre-test
+female_mSE_pre[female_mSE_pre$value==2,"value"] = "f_b1" # A little, pre-test
+female_mSE_pre[female_mSE_pre$value==3,"value"] = "f_c1" # A moderate amount, pre-test
+female_mSE_pre[female_mSE_pre$value==4,"value"] = "f_d1" # A lot, pre-test
+female_mSE_pre[female_mSE_pre$value==5,"value"] = "f_e1" # A great deal, pre-test
+
+female_mSE_post[female_mSE_post$value==1,"value"] = "f_a2" # Not at all, post-test
+female_mSE_post[female_mSE_post$value==2,"value"] = "f_b2" # A little, post-test
+female_mSE_post[female_mSE_post$value==3,"value"] = "f_c2" # A moderate amount, post-test
+female_mSE_post[female_mSE_post$value==4,"value"] = "f_d2" # A lot, post-test
+female_mSE_post[female_mSE_post$value==5,"value"] = "f_e2" # A great deal, post-test
+
+# Combine pre- and post-test dataframes for plotting
+mSE <- rbind(male_mSE_pre, male_mSE_post, female_mSE_pre, female_mSE_post)
+head(mSE)
+
+mSE_total = data.frame(Sex = rep(c("Female", "Male"), each = 10), Test = rep(c("Pre", "Post"), 5), Lab = row.names(table(mSE$value)), Freq = as.vector(table(mSE$value)), stringsAsFactors = FALSE)
+mSE_total$Test <- factor(mSE_total$Test, levels = c("Pre", "Post"), ordered = TRUE)
+
+# Stacked bar chart
+tests.labs = c("Pre-test", "Post-test")
+names(tests.labs) = c("Pre", "Post")
+
+# Stacked bar chart
+fig3c <- ggplot(mSE_total, aes(x=Sex, y=Freq)) + 
+  geom_bar(aes(fill=Lab), stat = "identity", position = "fill") +
+  theme_bw() +
+  facet_grid(~ Test, labeller = labeller(Test = tests.labs)) + 
+  scale_fill_manual("legend", values = c("f_a1" = "#DAE3F3", "f_b1" = "#B4C7E7", "f_c1" = "#8FAADC", "f_d1" = "#2F5597", "f_e1" = "#203864", "f_a2" = "#FBE5D6", "f_b2" = "#F8CBAD", "f_c2" = "#F4B183", "f_d2" = "#C55A11", "f_e2" = "#843C0C", "m_a1" = "#DAE3F3", "m_b1" = "#B4C7E7", "m_c1" = "#8FAADC", "m_d1" = "#2F5597", "m_e1" = "#203864", "m_a2" = "#FBE5D6", "m_b2" = "#F8CBAD", "m_c2" = "#F4B183", "m_d2" = "#C55A11", "m_e2" = "#843C0C")) + 
+  scale_x_discrete(labels = c("Women", "Men", "Women", "Men")) + 
+  theme(panel.grid.minor = element_blank(), panel.grid.major = element_blank(), axis.title=element_blank(), axis.text.y=element_blank(), axis.ticks = element_blank()) + 
+  theme(strip.background = element_blank(), panel.border = element_rect(colour = "white"), legend.position = "none") + 
+  ggtitle("Figure 3C") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig3c, filename="./Figures/Figure3C.svg", width = 4, height = 3)
+plot(fig3c)
+```
+
+# Figure 4
+
+Students with a net increase in research skills self-efficacy select different factors as the most important for contributing to their experience or comfort with experimental design.
+
+**Figure 4A**
+```{r}
+data2$ExpPercent = round((data2$ExperienceFreq / sum(data2$ExperienceFreq)) * 100, 2)
+data2$Category <- factor(data2$Category, levels = c("Sem", "CC", "Discussing", "Present", "Lab", "Read", "Mentor", "Write"), ordered = TRUE)
+
+fig4a <- ggplot(data2, aes(x="", y=ExpPercent, fill=Category))+
+  geom_bar(width = 1, stat = "identity") + 
+  coord_polar("y", start=0) + 
+  scale_fill_manual("Most important factor", values = c("Sem" = "#BEBEBE", "CC" = "#D64051", "Discussing" = "#F68E5C", "Present" = "#FDE08C", "Lab" = "#FBF8C0", "Read" = "#E4EA9A", "Mentor" = "#99D094", "Write" = "#3089BE"), labels = c(paste("Attending research seminars (", round(data2$ExpPercent[1], 0), "%)", sep=""), 
+                                              paste("Completing coursework (", round(data2$ExpPercent[2], 0), "%)", sep=""), 
+                                              paste("Discussing scientific topics with colleagues (", round(data2$ExpPercent[3], 0), "%)", sep=""), 
+                                              paste("Giving scientific presentations (", round(data2$ExpPercent[4], 0), "%)", sep=""), 
+                                              paste("Participating in laboratory research (", round(data2$ExpPercent[5], 0), "%)", sep=""), 
+                                              paste("Reading scientific literature (", round(data2$ExpPercent[6], 0), "%)", sep=""), 
+                                              paste("Recieving advice from mentors (", round(data2$ExpPercent[7], 0), "%)", sep=""), 
+                                              paste("Writing a project proposal (", round(data2$ExpPercent[8], 0), "%)", sep=""))) + 
+  theme_minimal() +
+  theme(axis.title = element_blank(), panel.border = element_blank(), panel.grid=element_blank(), axis.ticks = element_blank(), axis.text=element_blank()) + 
+  ggtitle("Figure 4A") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig4a, filename="./Figures/Figure4A.svg", width = 3, height = 3)
+plot(fig4a)
+```
+
+**Figure 4B**
+```{r}
+data2$ComfPercent = round((data2$ComfortFreq / sum(data2$ComfortFreq)) * 100, 2)
+
+fig4b <- ggplot(data2, aes(x="", y=ComfPercent, fill=Category))+
+  geom_bar(width = 1, stat = "identity") + 
+  coord_polar("y", start=0) + 
+  scale_fill_manual("Most important factor", values = c("Sem" = "#BEBEBE", "CC" = "#D64051", "Discussing" = "#F68E5C", "Present" = "#FDE08C", "Lab" = "#FBF8C0", "Read" = "#E4EA9A", "Mentor" = "#99D094", "Write" = "#3089BE"), labels = c(paste("Attending research seminars (", round(data2$ComfPercent[1], 0), "%)", sep=""), 
+                                              paste("Completing coursework (", round(data2$ComfPercent[2], 0), "%)", sep=""), 
+                                              paste("Discussing scientific topics with colleagues (", round(data2$ComfPercent[3], 0), "%)", sep=""), 
+                                              paste("Giving scientific presentations (", round(data2$ComfPercent[4], 0), "%)", sep=""), 
+                                              paste("Participating in laboratory research (", round(data2$ComfPercent[5], 0), "%)", sep=""), 
+                                              paste("Reading scientific literature (", round(data2$ComfPercent[6], 0), "%)", sep=""), 
+                                              paste("Recieving advice from mentors (", round(data2$ComfPercent[7], 0), "%)", sep=""), 
+                                              paste("Writing a project proposal (", round(data2$ComfPercent[8], 0), "%)", sep=""))) + 
+  theme_minimal() +
+  theme(axis.title = element_blank(), panel.border = element_blank(), panel.grid=element_blank(), axis.ticks = element_blank(), axis.text=element_blank()) + 
+  ggtitle("Figure 4B") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(fig4b, filename="./Figures/Figure4B.svg", width = 3, height = 3)
+plot(fig4b)
+```
